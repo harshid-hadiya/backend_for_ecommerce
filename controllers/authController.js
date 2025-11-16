@@ -30,7 +30,7 @@ exports.loginUser = (req, res) => {
 
       if (isPasswordValid) {
         const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
-        res.status(200).json({ message: 'Login successful', token });
+        res.status(200).json({ message: 'Login successful', token ,user });
       } else {
         res.status(401).json({ message: 'Invalid email or password' });
       }
