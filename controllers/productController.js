@@ -185,67 +185,98 @@ exports.deleteProduct = async (req, res) => {
 
 exports.adminDashboard = async (req, res) => {
   try {
-    const sqlAsync = (query) =>
+    const sqlAsync = (query, values = []) =>
       new Promise((resolve, reject) => {
-        mysqlConnection.query(query, (err, rows) => {
+        mysqlConnection.query(query, values, (err, rows) => {
           if (err) reject(err);
           else resolve(rows);
         });
       });
 
-   
-    const dailyRevenueSQL = `
+  
+    const dailyRevenueRows = await sqlAsync(`
       SELECT DATE(createdAt) AS date, SUM(total) AS revenue
-      FROM orders GROUP BY DATE(createdAt)
+      FROM orders 
+      GROUP BY DATE(createdAt)
       ORDER BY DATE(createdAt) DESC;
-    `;
-    const dailyRevenueRows = await sqlAsync(dailyRevenueSQL);
+    `);
 
     const dailyRevenue = dailyRevenueRows.map(r => ({
       date: r.date,
-      revenue: `₹${r.revenue.toFixed(2)}`
+      revenue: `₹${Number(r.revenue).toFixed(2)}`
     }));
 
-    const topCustomersSQL = `
+   
+    const topCustomerRows = await sqlAsync(`
       SELECT users.name, COUNT(orders.id) AS totalOrders, SUM(orders.total) AS totalSpent
       FROM orders
       JOIN users ON orders.userId = users.id
       GROUP BY users.id
       ORDER BY totalSpent DESC;
-    `;
-    const topCustomerRows = await sqlAsync(topCustomersSQL);
+    `);
 
     const topCustomers = topCustomerRows.map(r => ({
       name: r.name,
       orders: r.totalOrders,
-      spent: `₹${r.totalSpent.toFixed(2)}`
+      spent: `₹${Number(r.totalSpent).toFixed(2)}`
     }));
 
-    const categorySalesRaw = await Product.aggregate([
-      {
-        $lookup: {
-          from: "order_items",
-          localField: "_id",
-          foreignField: "productId",
-          as: "sales"
-        }
-      },
-      { $unwind: "$sales" },
-      {
-        $group: {
-          _id: "$category",
-          totalSales: { $sum: "$sales.priceAtPurchase" },
-          itemsSold: { $sum: "$sales.quantity" },
-          avgPrice: { $avg: "$price" }
-        }
-      }
-    ]);
+ 
+    const orderItems = await sqlAsync(`
+      SELECT productId, quantity, priceAtPurchase
+      FROM order_items;
+    `);
 
-    const categorySales = categorySalesRaw.map(c => ({
-      category: c._id,
+    if (orderItems.length === 0) {
+      return res.status(200).json({
+        dailyRevenue,
+        topCustomers,
+        categorySales: []
+      });
+    }
+
+    const productIds = orderItems.map(item => item.productId);
+
+    const mongoProducts = await Product.find(
+      { _id: { $in: productIds } },
+      { category: 1, price: 1 }
+    );
+
+    const productMap = {};
+    mongoProducts.forEach(p => {
+      productMap[p._id.toString()] = p;
+    });
+
+    const categoryMap = {};
+
+    for (const item of orderItems) {
+      const productId = item.productId;
+      const product = productMap[productId];
+
+      if (!product) continue; 
+      const cat = product.category;
+
+      if (!categoryMap[cat]) {
+        categoryMap[cat] = {
+          category: cat,
+          totalSales: 0,
+          itemsSold: 0,
+          totalPrice: 0,
+          priceCount: 0
+        };
+      }
+
+      categoryMap[cat].totalSales += item.priceAtPurchase * item.quantity;
+      categoryMap[cat].itemsSold += item.quantity;
+      categoryMap[cat].totalPrice += product.price;
+      categoryMap[cat].priceCount += 1;
+    }
+
+    const categorySales = Object.values(categoryMap).map(c => ({
+      category: c.category,
       totalSales: `₹${c.totalSales.toFixed(2)}`,
       itemsSold: c.itemsSold,
-      avgPrice: `₹${c.avgPrice.toFixed(2)}`
+      avgPrice: `₹${(c.totalPrice / c.priceCount).toFixed(2)}`
     }));
 
     res.status(200).json({
@@ -255,6 +286,7 @@ exports.adminDashboard = async (req, res) => {
     });
 
   } catch (error) {
+    console.error("Dashboard Error:", error);
     res.status(500).json({
       message: "Error generating admin dashboard",
       error: error.message
