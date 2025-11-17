@@ -5,7 +5,7 @@ const mysqlConnection = require('../config/mysqlConnection');
 exports.getAllProducts = async (req, res) => {
   try {
     const id = req.query?.sort;
-    const products = await Product.find().sort((id === "asc") ? { _id: 1 } : { _id: -1 }); 
+    const products = await Product.find().sort((id === "asc") ? { price: 1 } : { price: -1 }); 
     res.status(200).json(products);
   } catch (error) {
     res.status(500).json({
