@@ -1,6 +1,6 @@
 const Product = require('../models/Product');
 const { rawListeners } = require('../server');
-
+const mysqlConnection = require('../config/mysqlConnection');
 // Get all products
 exports.getAllProducts = async (req, res) => {
   try {
