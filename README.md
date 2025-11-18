@@ -2,8 +2,8 @@
 
 ## Admin Login Credentials
 ```
-Email: admin@example.com
-Password: admin123
+Email: testuser@example.com
+Password: password123
 ```
 ## 1. Overview
 This is the backend for an e-commerce application built using **Node.js**, **Express.js**, **MongoDB**, and **MySQL**. It provides authentication, product management, and order processing. The project is designed in a simple, student-friendly manner for clarity and evaluation.
@@ -213,14 +213,6 @@ Expected:
 
 ---
 
-## Frontend Routes Summary
-- `/login` – User login
-- `/register` – User signup
-- `/products` – Product list
-- `/admin/add-product` – Add product (Admin)
-- `/orders` – My orders
-
----
 
 ## Deployment
 - Backend URL: (https://backend-for-ecommerce-1.onrender.com)
